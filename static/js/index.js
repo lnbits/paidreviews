@@ -66,15 +66,31 @@ window.app = Vue.createApp({
     async saveSettings() {
       this.savingSettings = true
       try {
-        this.settings = await LNbits.api
-          .request(
-            'POST',
-            '/paidreviews/api/v1/settings',
-            this.g.user.wallets[0].adminkey,
-            this.settings
-          )
-          .then(r => r.data)
+        if (!this.settings.id) {
+          this.settings = await LNbits.api
+            .request(
+              'POST',
+              '/paidreviews/api/v1/settings',
+              this.g.user.wallets[0].adminkey,
+              this.settings
+            )
+            .then(r => r.data)
+        } else {
+          this.settings = await LNbits.api
+            .request(
+              'PUT',
+              `/paidreviews/api/v1/settings/${encodeURIComponent(this.settings.id)}`,
+              this.g.user.wallets[0].adminkey,
+              this.settings
+            )
+            .then(r => r.data)
+        }
       } finally {
+        this.$q.notify({
+          type: 'positive',
+          message: 'Settings saved successfully',
+          position: 'bottom'
+        })
         this.savingSettings = false
       }
     },
@@ -85,13 +101,28 @@ window.app = Vue.createApp({
           `/paidreviews/api/v1/review/${encodeURIComponent(id)}`,
           this.g.user.wallets[0].adminkey
         )
-        // After delete, refresh the current page + stats
+
+        // Optimistically remove from current page
+        const beforeCount = this.allReviews.length
+        this.allReviews = this.allReviews.filter(r => r.id !== id)
+
+        // Optionally nudge counters locally (server will correct on refetch)
+        if (beforeCount !== this.allReviews.length && this.reviewCount > 0) {
+          this.reviewCount -= 1
+        }
+
+        // Refresh the same page cursor + stats from server
         await this.fetchPage({
           before: this.cursorStack[this.cursorStack.length - 1] ?? null,
           reset: true
         })
       } catch (e) {
         console.error(e)
+        this.$q.notify({
+          type: 'negative',
+          message: 'Delete failed',
+          position: 'bottom'
+        })
       }
     },
     resetAndLoad() {
@@ -110,12 +141,23 @@ window.app = Vue.createApp({
       this.paidReviewsLoading = true
       try {
         const params = new URLSearchParams({limit: String(this.limit)})
-        if (before !== null && before !== undefined)
+
+        if (before !== null && before !== undefined) {
           params.set('before', String(before))
+        }
+
+        // Cache buster so we don’t get stale lists after DELETE
+        params.set(
+          '_',
+          typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : String(Date.now())
+        )
 
         const url =
           `/paidreviews/api/v1/${encodeURIComponent(this.settings.id)}/${encodeURIComponent(this.selectedTag)}?` +
           params.toString()
+
         const data = await LNbits.api
           .request('GET', url, this.g.user.wallets[0].adminkey)
           .then(r => r.data)
@@ -126,6 +168,7 @@ window.app = Vue.createApp({
         this.reviewCount = Number(data.review_count || 0)
 
         if (reset) {
+          // keep the current page’s cursor at the top of the stack
           this.cursorStack = [before ?? null]
         } else if (before !== null && before !== undefined) {
           this.cursorStack.push(before)

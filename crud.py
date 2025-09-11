@@ -1,5 +1,4 @@
 from lnbits.db import Database
-from lnbits.helpers import urlsafe_short_hash
 
 from .models import PRSettings, RatingStats, Review
 
@@ -9,8 +8,6 @@ db = Database("ext_paidreviews")
 
 
 async def create_settings(data: PRSettings) -> PRSettings:
-    if not data.id or data.id == "":
-        data.id = urlsafe_short_hash()
     await db.insert("paidreviews.prsettings", data)
     return PRSettings(**data.dict())
 

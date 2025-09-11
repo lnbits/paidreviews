@@ -41,8 +41,8 @@ async def api_create_settings(
     data: CreatePrSettings,
     wallet: WalletTypeInfo = Depends(require_admin_key),
 ) -> PRSettings:
-    data.user = wallet.wallet.user
     settings = PRSettings(**data.dict())
+    settings.user = wallet.wallet.user
     settings = await create_settings(settings)
     return settings
 

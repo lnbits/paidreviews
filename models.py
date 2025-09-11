@@ -16,8 +16,8 @@ class CreatePrSettings(BaseModel):
 
 
 class PRSettings(BaseModel):
-    id: str
-    user: str
+    id: str = Field(default_factory=urlsafe_short_hash)
+    user: str | None = None
     wallet: str
     cost: int
     name: str | None = None

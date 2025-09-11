@@ -163,172 +163,178 @@
 </q-dialog>
 {% endblock %} {% block scripts %}
 <script>
-    const pr_reviews = {{ pr_reviews | tojson | safe }}
-    const initialAvg = '{{pr_avg_rating}}'
+      const pr_reviews = {{ pr_reviews | tojson | safe }}
+      const initialAvg = '{{pr_avg_rating}}'
 
-    window.app = Vue.createApp({
-      el: '#vue',
-      mixins: [windowMixin],
-      data () {
-        return {
-          pr_settings_id: '{{pr_settings_id}}',
-          pr_name: '{{pr_name}}',
-          pr_description: '{{pr_description}}',
-          pr_tag: '{{pr_tag}}',
-          pr_cost: '{{pr_cost}}',
-          pr_comment_word_limit: '{{pr_comment_word_limit}}',
+      window.app = Vue.createApp({
+        el: '#vue',
+        mixins: [windowMixin],
+        data () {
+          return {
+            pr_settings_id: '{{pr_settings_id}}',
+            pr_name: '{{pr_name}}',
+            pr_description: '{{pr_description}}',
+            pr_tag: '{{pr_tag}}',
+            pr_cost: '{{pr_cost}}',
+            pr_comment_word_limit: '{{pr_comment_word_limit}}',
 
-          // list + stats
-          pr_reviews: pr_reviews || [],
-          pr_avg_rating: isNaN(initialAvg) ? 0 : initialAvg,
-          pr_review_count: Array.isArray(pr_reviews) ? pr_reviews.length : 0,
+            // list + stats
+            pr_reviews: pr_reviews || [],
+            pr_avg_rating: isNaN(initialAvg) ? 0 : initialAvg,
+            pr_review_count: Array.isArray(pr_reviews) ? pr_reviews.length : 0,
 
-          // pagination
-          limit: 10,
-          nextCursor: null,
-          cursorStack: [null], // track cursors to support "Back"
-          loading: false,
+            // pagination
+            limit: 10,
+            nextCursor: null,
+            cursorStack: [null], // track cursors to support "Back"
+            loading: false,
 
-          // review form
-          name: '',
-          rating: 0,
-          text: '',
+            // review form
+            name: '',
+            rating: 0,
+            text: '',
 
-          // invoice dialog
-          payment: {
-            show: false,
-            invoice: '',
-            hash: ''
-          }
-        }
-      },
-      computed: {
-        canGoBack () {
-          return this.cursorStack.length > 1
-        },
-  avgRating () {
-    const v = Math.round(this.pr_avg_rating) / 2 / 100
-    // snap to nearest 0.5
-    const snapped = Math.round(v * 2) / 2
-    return snapped
-  }
-      },
-      mounted () {
-        // Replace server-rendered first page with API response to also get stats+cursor
-        this.fetchPage({ before: null, reset: true }).catch(() => {})
-      },
-      methods: {
-        async fetchPage ({ before = null, reset = false } = {}) {
-          this.loading = true
-          try {
-            const params = new URLSearchParams({ limit: String(this.limit) })
-            if (before !== null && before !== undefined) params.set('before', String(before))
-
-            const url = `/paidreviews/api/v1/${this.pr_settings_id}/${this.pr_tag}?` + params.toString()
-            const data = await LNbits.api.request('GET', url).then(r => r.data)
-
-            // Apply page
-            this.pr_reviews = data.items || []
-            this.nextCursor = data.next_cursor || null
-            this.pr_avg_rating = Number(data.avg_rating || 0)
-            this.pr_review_count = Number(data.review_count || 0)
-
-            // Manage cursor stack
-            if (reset) {
-              this.cursorStack = [null]
-            } else if (before !== null && before !== undefined) {
-              // pushed when moving forward
-              this.cursorStack.push(before)
+            // invoice dialog
+            payment: {
+              show: false,
+              invoice: '',
+              hash: ''
             }
-          } catch (e) {
-            console.error(e)
-            this.$q.notify({ type: 'negative', message: 'Failed to load reviews', position: 'bottom' })
-          } finally {
-            this.loading = false
           }
         },
-
-        async goNext () {
-          if (!this.nextCursor) return
-          await this.fetchPage({ before: this.nextCursor, reset: false })
+        computed: {
+          canGoBack () {
+            return this.cursorStack.length > 1
+          },
+    avgRating () {
+      const v = Math.round(this.pr_avg_rating) / 2 / 100
+      // snap to nearest 0.5
+      const snapped = Math.round(v * 2) / 2
+      return snapped
+    }
         },
-
-        async goBack () {
-          if (!this.canGoBack) return
-          // Pop current cursor and read previous
-          this.cursorStack.pop() // remove current
-          const prev = this.cursorStack[this.cursorStack.length - 1] ?? null
-          // Reload using the previous cursor (null -> first page)
-          await this.fetchPage({ before: prev, reset: true })
+        mounted () {
+          // Replace server-rendered first page with API response to also get stats+cursor
+          this.fetchPage({ before: null, reset: true }).catch(() => {})
         },
-
-        async onSubmit () {
-          const review = {
-            settings_id: this.pr_settings_id,
-            name: this.name,
-            tag: this.pr_tag,
-            rating: this.rating * 100, // your backend expects 0..1000
-            comment: this.text
-          }
-
-          const submit_review = await LNbits.api.request('POST', '/paidreviews/api/v1/review', null, review)
-            .then(r => r.data)
-            .catch(e => {
-              console.log(e)
-              const detail = e?.response?.data?.detail || e?.message || 'Unknown error'
-              this.$q.notify({ type: 'negative', message: detail, position: 'bottom' })
-              return null
-            })
-
-          if (!submit_review) return
-
-          if (submit_review.payment_request) {
-            this.payment.invoice = submit_review.payment_request
-            this.payment.hash = submit_review.payment_hash
-            this.payment.show = true
-            this.$q.notify({ type: 'positive', message: 'Please pay the invoice to submit your review.', position: 'bottom' })
-            this.websocket(this.payment.hash)
-          } else if (submit_review.message === true) {
-            this.$q.notify({ type: 'positive', message: 'Message posted.', position: 'bottom' })
-            this.onReset()
-            // Refresh first page + stats after a free (cost=0) review
-            await this.fetchPage({ before: null, reset: true })
-          } else {
-            this.$q.notify({ type: 'negative', message: 'Please try again.', position: 'bottom' })
-          }
-        },
-
-        onReset () {
-          this.name = ''
-          this.rating = 0
-          this.text = ''
-          this.payment.show = false
-        },
-
-        // Legacy function now calls the new paginated API for the first page
-        async getReviews () {
-          await this.fetchPage({ before: null, reset: true })
-        },
-
-        fixRating (rating) {
-          // convert 0..1000 -> 0..5 with .5 steps
-          return Math.round((rating / 2 / 100) * 2) / 2
-        },
-
-        websocket (hash) {
-          const url = new URL(window.location)
-          url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-          url.pathname = `/api/v1/ws/${hash}`
-          const ws = new WebSocket(url)
-          ws.addEventListener('message', async () => {
-            this.$q.notify({ type: 'positive', message: 'Invoice Paid' })
-            this.onReset()
-            // After payment, refresh first page + stats
-            await this.fetchPage({ before: null, reset: true })
-            ws.close()
-          })
-        }
+        methods: {
+          async fetchPage ({ before = null, reset = false } = {}) {
+    this.loading = true
+    try {
+      const params = new URLSearchParams({ limit: String(this.limit) })
+      if (before !== null && before !== undefined) {
+        params.set('before', String(before))
       }
-    })
+
+      // Cache buster to avoid stale lists after create/pay
+      params.set('_', (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : String(Date.now()))
+
+      const url = `/paidreviews/api/v1/${this.pr_settings_id}/${this.pr_tag}?` + params.toString()
+      const data = await LNbits.api.request('GET', url).then(r => r.data)
+
+      this.pr_reviews      = data.items || []
+      this.nextCursor      = data.next_cursor || null
+      this.pr_avg_rating   = Number(data.avg_rating || 0)
+      this.pr_review_count = Number(data.review_count || 0)
+
+      if (reset) {
+        // reflect the current page’s cursor in the stack
+        this.cursorStack = [before ?? null]
+      } else if (before !== null && before !== undefined) {
+        this.cursorStack.push(before)
+      }
+    } catch (e) {
+      console.error(e)
+      this.$q.notify({ type: 'negative', message: 'Failed to load reviews', position: 'bottom' })
+    } finally {
+      this.loading = false
+    }
+  }
+  ,
+
+          async goNext () {
+            if (!this.nextCursor) return
+            await this.fetchPage({ before: this.nextCursor, reset: false })
+          },
+
+          async goBack () {
+            if (!this.canGoBack) return
+            // Pop current cursor and read previous
+            this.cursorStack.pop() // remove current
+            const prev = this.cursorStack[this.cursorStack.length - 1] ?? null
+            // Reload using the previous cursor (null -> first page)
+            await this.fetchPage({ before: prev, reset: true })
+          },
+
+          async onSubmit () {
+            const review = {
+              settings_id: this.pr_settings_id,
+              name: this.name,
+              tag: this.pr_tag,
+              rating: this.rating * 100, // your backend expects 0..1000
+              comment: this.text
+            }
+
+            const submit_review = await LNbits.api.request('POST', '/paidreviews/api/v1/review', null, review)
+              .then(r => r.data)
+              .catch(e => {
+                console.log(e)
+                const detail = e?.response?.data?.detail || e?.message || 'Unknown error'
+                this.$q.notify({ type: 'negative', message: detail, position: 'bottom' })
+                return null
+              })
+
+            if (!submit_review) return
+
+            if (submit_review.payment_request) {
+              this.payment.invoice = submit_review.payment_request
+              this.payment.hash = submit_review.payment_hash
+              this.payment.show = true
+              this.$q.notify({ type: 'positive', message: 'Please pay the invoice to submit your review.', position: 'bottom' })
+              this.websocket(this.payment.hash)
+            } else if (submit_review.message === true) {
+              this.$q.notify({ type: 'positive', message: 'Message posted.', position: 'bottom' })
+              this.onReset()
+              // Refresh first page + stats after a free (cost=0) review
+              await this.fetchPage({ before: null, reset: true })
+            } else {
+              this.$q.notify({ type: 'negative', message: 'Please try again.', position: 'bottom' })
+            }
+          },
+
+          onReset () {
+            this.name = ''
+            this.rating = 0
+            this.text = ''
+            this.payment.show = false
+          },
+
+          // Legacy function now calls the new paginated API for the first page
+          async getReviews () {
+            await this.fetchPage({ before: null, reset: true })
+          },
+
+          fixRating (rating) {
+            // convert 0..1000 -> 0..5 with .5 steps
+            return Math.round((rating / 2 / 100) * 2) / 2
+          },
+
+          websocket (hash) {
+            const url = new URL(window.location)
+            url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+            url.pathname = `/api/v1/ws/${hash}`
+            const ws = new WebSocket(url)
+            ws.addEventListener('message', async () => {
+              this.$q.notify({ type: 'positive', message: 'Invoice Paid' })
+              this.onReset()
+              // After payment, refresh first page + stats
+              await this.fetchPage({ before: null, reset: true })
+              ws.close()
+            })
+          }
+        }
+      })
 </script>
 {% endblock %}
