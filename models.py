@@ -1,4 +1,5 @@
-from typing import Optional, List
+from datetime import datetime, timezone
+
 from fastapi import Query
 from pydantic import BaseModel, Field
 
@@ -11,7 +12,7 @@ class PRSettings(BaseModel):
     wallet: str | None = Field(default=None)
     user: str | None = Field(default=None)
     comment_word_limit: int = Field(default=0, ge=0)
-    tags: List[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
 
 
 class Review(BaseModel):
@@ -40,14 +41,15 @@ class ReturnedReview(BaseModel):
     tag: str | None = Field(default=None)
     rating: int = Field(default=0, ge=0, le=1000)
     comment: str | None = Field(default=None)
-    created_at: str | None = Field(default=None)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class KeysetPage(BaseModel):
     items: list[ReturnedReview]
-    next_cursor: Optional[int] = None
+    next_cursor: int | None = None
     review_count: int = 0
     avg_rating: float = 0.0
+
 
 class RatingStats(BaseModel):
     review_count: int = Field(0, ge=0)

@@ -17,6 +17,7 @@ async def m001_settings(db):
     """
     )
 
+
 async def m002_reviews(db):
     """
     Initial reviews table.
@@ -36,6 +37,7 @@ async def m002_reviews(db):
         );
     """
     )
+
 
 async def m003_average(db):
     """

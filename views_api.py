@@ -1,34 +1,32 @@
 # Description: This file contains the extensions API endpoints.
 
-from typing import Optional
 from http import HTTPStatus
 
-from fastapi import APIRouter, Depends, Request, Query, Response
-from lnbits.core.crud import get_user
+from fastapi import APIRouter, Depends, Query, Response
 from lnbits.core.models import WalletTypeInfo
 from lnbits.core.services import create_invoice
 from lnbits.decorators import require_admin_key
-from starlette.exceptions import HTTPException
 from loguru import logger
+from starlette.exceptions import HTTPException
 
 from .crud import (
-    update_settings,
-    create_settings,
-    get_settings,
-    get_tags,
     create_review,
-    get_reviews,
+    create_settings,
     delete_review,
-    get_reviews_by_tag,
+    get_rating_stats,
     get_review,
+    get_reviews,
+    get_reviews_by_tag,
+    get_settings,
     get_settings_from_id,
-    get_rating_stats
+    update_settings,
 )
-from .models import PRSettings, Review, PostReview, ReturnedReview, KeysetPage
+from .models import KeysetPage, PostReview, PRSettings, ReturnedReview, Review
 
 paidreviews_api_router = APIRouter()
 
 ############################# Settings #############################
+
 
 @paidreviews_api_router.get("/api/v1/settings")
 async def api_settings(
@@ -55,17 +53,26 @@ async def api_update_settings(
         settings = await create_settings(data)
     return settings
 
+
 ############################## Tags #############################
+
 
 @paidreviews_api_router.get("/api/v1/tags/{settings_id}")
 async def api_get_tags(settings_id: str) -> list[str]:
-    return await get_tags(settings_id)
+    settings = await get_settings_from_id(settings_id)
+    if not settings:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="Settings do not exist."
+        )
+    return settings.tags
+
 
 ############################# Reviews #############################
 
 ## TO DO:
 ## Add pagination to the reviews endpoint
 ## Delete unpaid reviiews after a certain time period
+
 
 @paidreviews_api_router.get("/api/v1/{settings_id}")
 async def api_reviews(
@@ -85,13 +92,15 @@ async def api_reviews(
     response_model=KeysetPage,
 )
 async def api_reviews_by_tag(
+    response: Response,
     settings_id: str,
     tag: str,
-    limit: int = Query(..., ge=1, le=50, description="Number of reviews to return (1–50)."),
-    before: Optional[int] = Query(
+    limit: int = Query(
+        ..., ge=1, le=50, description="Number of reviews to return (1-50)."
+    ),
+    before: int | None = Query(
         None, description="Return items with created_at < this unix timestamp."
     ),
-    response: Response = None,
 ):
     items = await get_reviews_by_tag(
         settings_id=settings_id,
@@ -101,7 +110,7 @@ async def api_reviews_by_tag(
     )
 
     next_cursor = None
-    if items and len(items) == limit:
+    if items and len(items) == limit and items[-1].created_at:
         next_cursor = int(items[-1].created_at)
 
     stats = await get_rating_stats(settings_id, tag)
@@ -118,7 +127,6 @@ async def api_reviews_by_tag(
         review_count=stats.review_count,
         avg_rating=stats.avg_rating,
     )
-
 
 
 @paidreviews_api_router.post("/api/v1/review", status_code=HTTPStatus.CREATED)
@@ -144,7 +152,10 @@ async def api_make_review(data: PostReview) -> dict:
     ):
         raise HTTPException(
             status_code=HTTPStatus.BAD_REQUEST,
-            detail=f"Comment must be smaller than {settings.comment_word_limit} characters.",
+            detail=(
+                "Comment must be smaller than "
+                f"{settings.comment_word_limit} characters."
+            ),
         )
     try:
         review = Review(
@@ -181,7 +192,7 @@ async def api_make_review(data: PostReview) -> dict:
     except Exception as e:
         raise HTTPException(
             status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
-            detail=str("Could not create invoice."),
+            detail="Could not create invoice.",
         ) from e
 
 
