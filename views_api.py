@@ -1,13 +1,10 @@
-# Description: This file contains the extensions API endpoints.
-
 from http import HTTPStatus
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from lnbits.core.models import WalletTypeInfo
 from lnbits.core.services import create_invoice
 from lnbits.decorators import require_admin_key
 from loguru import logger
-from starlette.exceptions import HTTPException
 
 from .crud import (
     create_review,
@@ -15,13 +12,12 @@ from .crud import (
     delete_review,
     get_rating_stats,
     get_review,
-    get_reviews,
     get_reviews_by_tag,
     get_settings,
     get_settings_from_id,
     update_settings,
 )
-from .models import KeysetPage, PostReview, PRSettings, ReturnedReview, Review
+from .models import CreatePrSettings, KeysetPage, PostReview, PRSettings, Review
 
 paidreviews_api_router = APIRouter()
 
@@ -41,16 +37,38 @@ async def api_settings(
 
 
 @paidreviews_api_router.post("/api/v1/settings")
-async def api_update_settings(
-    data: PRSettings,
+async def api_create_settings(
+    data: CreatePrSettings,
     wallet: WalletTypeInfo = Depends(require_admin_key),
 ) -> PRSettings:
-    logger.debug(data)
     data.user = wallet.wallet.user
-    if data.id:
-        settings = await update_settings(data)
-    else:
-        settings = await create_settings(data)
+    settings = PRSettings(**data.dict())
+    settings = await create_settings(settings)
+    return settings
+
+
+@paidreviews_api_router.put("/api/v1/settings/{settings_id}")
+async def api_update_settings(
+    settings_id: str,
+    data: CreatePrSettings,
+    wallet: WalletTypeInfo = Depends(require_admin_key),
+) -> PRSettings:
+    settings = await get_settings_from_id(settings_id)
+    if not settings:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="Settings do not exist."
+        )
+
+    if settings.user != wallet.wallet.user:
+        raise HTTPException(
+            status_code=HTTPStatus.FORBIDDEN, detail="Not your reviews."
+        )
+
+    for field, value in data.dict().items():
+        if value is not None:
+            setattr(settings, field, value)
+
+    settings = await update_settings(settings)
     return settings
 
 
@@ -74,23 +92,7 @@ async def api_get_tags(settings_id: str) -> list[str]:
 ## Delete unpaid reviiews after a certain time period
 
 
-@paidreviews_api_router.get("/api/v1/{settings_id}")
-async def api_reviews(
-    settings_id: str,
-    wallet: WalletTypeInfo = Depends(require_admin_key),
-) -> list[ReturnedReview]:
-    reviews = await get_reviews(settings_id)
-    if not reviews:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="No reviews found."
-        )
-    return reviews
-
-
-@paidreviews_api_router.get(
-    "/api/v1/{settings_id}/{tag}",
-    response_model=KeysetPage,
-)
+@paidreviews_api_router.get("/api/v1/{settings_id}/{tag}")
 async def api_reviews_by_tag(
     response: Response,
     settings_id: str,
@@ -101,7 +103,7 @@ async def api_reviews_by_tag(
     before: int | None = Query(
         None, description="Return items with created_at < this unix timestamp."
     ),
-):
+) -> KeysetPage:
     items = await get_reviews_by_tag(
         settings_id=settings_id,
         tag=tag,

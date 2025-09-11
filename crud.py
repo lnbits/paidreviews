@@ -1,7 +1,7 @@
 from lnbits.db import Database
 from lnbits.helpers import urlsafe_short_hash
 
-from .models import PostReview, PRSettings, RatingStats, ReturnedReview, Review
+from .models import PRSettings, RatingStats, Review
 
 db = Database("ext_paidreviews")
 
@@ -39,19 +39,18 @@ async def get_settings_from_id(settings_id: str) -> PRSettings | None:
 ############################# Reviews #############################
 
 
-async def create_review(data: PostReview) -> ReturnedReview:
-    data.id = urlsafe_short_hash()
+async def create_review(data: Review) -> Review:
     await db.insert("paidreviews.reviews", data)
-    return ReturnedReview(**data.dict())
+    return data
 
 
-async def get_reviews(settings_id: str | list[str]) -> list[ReturnedReview]:
+async def get_reviews(settings_id: str | list[str]) -> list[Review]:
     return await db.fetchall(
         "SELECT * FROM paidreviews.reviews "
         "WHERE settings_id = :settings_id AND paid = :paid "
         "ORDER BY CAST(created_at AS INTEGER) DESC",
         {"settings_id": settings_id, "paid": True},
-        model=ReturnedReview,
+        model=Review,
     )
 
 
@@ -77,7 +76,7 @@ async def get_reviews_by_tag(
     *,
     limit: int,
     before_created_at: int | None = None,
-) -> list[ReturnedReview]:
+) -> list[Review]:
     params = {
         "settings_id": settings_id,
         "tag": tag,
@@ -108,12 +107,12 @@ async def get_reviews_by_tag(
             LIMIT :limit
         """
 
-    return await db.fetchall(sql, params, model=ReturnedReview)
+    return await db.fetchall(sql, params, model=Review)
 
 
 async def update_review(data: Review) -> Review:
     await db.update("paidreviews.reviews", data)
-    return Review(**data.dict())
+    return data
 
 
 async def get_rating_stats(settings_id: str, tag: str) -> RatingStats:

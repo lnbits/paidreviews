@@ -86,9 +86,11 @@ async def manifest(settings_id: str, tag: str):
             status_code=HTTPStatus.NOT_FOUND, detail="Tag does not exist."
         )
 
+    name = f"{pr_settings.name} - {settings.lnbits_site_title}"
+    url = "/paidreviews/" + settings_id + "/" + tag
     return {
         "short_name": settings.lnbits_site_title,
-        "name": pr_settings.name + " - " + settings.lnbits_site_title,
+        "name": name,
         "icons": [
             {
                 "src": (
@@ -100,20 +102,18 @@ async def manifest(settings_id: str, tag: str):
                 "sizes": "900x900",
             }
         ],
-        "start_url": "/paidreviews/" + settings_id + "/" + tag,
+        "start_url": url,
         "background_color": "#1F2234",
         "description": "Minimal extension to build on",
         "display": "standalone",
-        "scope": "/paidreviews/" + settings_id + "/" + tag,
+        "scope": url,
         "theme_color": "#1F2234",
         "shortcuts": [
             {
-                "name": pr_settings.name + " - " + settings.lnbits_site_title,
+                "name": name,
                 "short_name": pr_settings.name,
-                "description": pr_settings.description
-                + " - "
-                + settings.lnbits_site_title,
-                "url": "/paidreviews/" + settings_id + "/" + tag,
+                "description": name,
+                "url": url,
             }
         ],
     }
