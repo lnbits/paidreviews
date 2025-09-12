@@ -1,6 +1,6 @@
 {
   "name": "PaidReviews",
-  "short_description": "Pay to leave reviews based on tags.",
+  "short_description": "Pay to leave reviews based on tags",
   "tile": "/paidreviews/static/image/paidreviews.png",
   "min_lnbits_version": "1.3.0",
   "contributors": [
