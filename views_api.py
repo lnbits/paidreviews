@@ -11,14 +11,21 @@ from .crud import (
     create_settings,
     delete_review,
     get_rating_stats,
+    get_rating_stats_for_all_tags,
     get_review,
     get_reviews_by_tag,
     get_settings,
     get_settings_from_id,
     update_settings,
-    get_rating_stats_for_all_tags,
 )
-from .models import CreatePrSettings, KeysetPage, PostReview, PRSettings, Review, RatingStats
+from .models import (
+    CreatePrSettings,
+    KeysetPage,
+    PostReview,
+    PRSettings,
+    RatingStats,
+    Review,
+)
 
 paidreviews_api_router = APIRouter()
 
@@ -75,11 +82,13 @@ async def api_update_settings(
 
 ############################## Tags #############################
 
+
 @paidreviews_api_router.get("/api/v1/tags/{settings_id}")
 async def api_get_tags(response: Response, settings_id: str) -> list[RatingStats]:
     tags = await get_rating_stats_for_all_tags(settings_id)
     response.headers["Cache-Control"] = "public, max-age=30"
     return tags
+
 
 ############################# Reviews #############################
 

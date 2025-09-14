@@ -126,7 +126,8 @@ async def get_rating_stats(settings_id: str, tag: str) -> RatingStats:
         {"settings_id": settings_id, "tag": tag},
         RatingStats,  # let the DB wrapper hydrate the model
     )
-    return row or RatingStats(review_count=0, avg_rating=0.0)
+    return row or RatingStats(review_count=0, avg_rating=0)
+
 
 async def get_rating_stats_for_all_tags(settings_id: str) -> list[RatingStats]:
     return await db.fetchall(
@@ -139,6 +140,7 @@ async def get_rating_stats_for_all_tags(settings_id: str) -> list[RatingStats]:
         {"settings_id": settings_id},
         RatingStats,
     )
+
 
 async def delete_review(review_id: str) -> None:
     await db.execute(
