@@ -16,8 +16,9 @@ from .crud import (
     get_settings,
     get_settings_from_id,
     update_settings,
+    get_rating_stats_for_all_tags,
 )
-from .models import CreatePrSettings, KeysetPage, PostReview, PRSettings, Review
+from .models import CreatePrSettings, KeysetPage, PostReview, PRSettings, Review, RatingStats
 
 paidreviews_api_router = APIRouter()
 
@@ -74,16 +75,11 @@ async def api_update_settings(
 
 ############################## Tags #############################
 
-
 @paidreviews_api_router.get("/api/v1/tags/{settings_id}")
-async def api_get_tags(settings_id: str) -> list[str]:
-    settings = await get_settings_from_id(settings_id)
-    if not settings:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="Settings do not exist."
-        )
-    return settings.tags
-
+async def api_get_tags(response: Response, settings_id: str) -> list[RatingStats]:
+    tags = await get_rating_stats_for_all_tags(settings_id)
+    response.headers["Cache-Control"] = "public, max-age=30"
+    return tags
 
 ############################# Reviews #############################
 

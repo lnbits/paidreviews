@@ -128,6 +128,17 @@ async def get_rating_stats(settings_id: str, tag: str) -> RatingStats:
     )
     return row or RatingStats(review_count=0, avg_rating=0.0)
 
+async def get_rating_stats_for_all_tags(settings_id: str) -> list[RatingStats]:
+    return await db.fetchall(
+        """
+        SELECT tag, review_count, avg_rating
+        FROM paidreviews.paidreviews_view_review_stats
+        WHERE settings_id = :settings_id
+        ORDER BY review_count DESC, tag ASC
+        """,
+        {"settings_id": settings_id},
+        RatingStats,
+    )
 
 async def delete_review(review_id: str) -> None:
     await db.execute(
