@@ -35,9 +35,7 @@ class Review(BaseModel):
     comment: str | None = Field(default=None)
     paid: bool = Field(default=False)
     payment_hash: str | None = Field(default=None)
-    created_at: int = Field(
-        default_factory=lambda: int(datetime.now(timezone.utc).timestamp())
-    )
+    created_at: datetime = datetime.now(timezone.utc)
 
 
 class PostReview(BaseModel):

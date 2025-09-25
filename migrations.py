@@ -42,19 +42,32 @@ async def m002_reviews(db):
 async def m003_average(db):
     """
     Create a view to hold aggregated review stats (count + avg).
-    Note: In SQLite, a view can only reference objects in the same database.
-    So we create the view inside the 'paidreviews' database/schema.
     """
-    await db.execute(
-        """
-        CREATE VIEW IF NOT EXISTS paidreviews.paidreviews_view_review_stats AS
-        SELECT
-          settings_id,
-          tag,
-          COUNT(*) AS review_count,
-          AVG(CAST(rating AS REAL)) AS avg_rating
-        FROM reviews
-        WHERE paid = 1
-        GROUP BY settings_id, tag;
-        """
-    )
+    if db.type in {"POSTGRES", "COCKROACH"}:
+        await db.execute(
+            """
+            CREATE OR REPLACE VIEW paidreviews.paidreviews_view_review_stats AS
+            SELECT
+              settings_id,
+              tag,
+              COUNT(*) AS review_count,
+              AVG(CAST(rating AS REAL)) AS avg_rating
+            FROM paidreviews.reviews
+            WHERE paid = TRUE
+            GROUP BY settings_id, tag;
+            """
+        )
+    elif db.type == "SQLITE":
+        await db.execute(
+            """
+            CREATE VIEW IF NOT EXISTS paidreviews.paidreviews_view_review_stats AS
+            SELECT
+              settings_id,
+              tag,
+              COUNT(*) AS review_count,
+              AVG(CAST(rating AS REAL)) AS avg_rating
+            FROM reviews
+            WHERE paid = 1
+            GROUP BY settings_id, tag;
+            """
+        )

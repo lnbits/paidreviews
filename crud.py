@@ -81,26 +81,31 @@ async def get_reviews_by_tag(
         "limit": limit,
     }
 
+    if db.type in {"POSTGRES", "COCKROACH"}:
+        epoch_expr = "EXTRACT(EPOCH FROM created_at)::BIGINT"
+    else:  # SQLITE
+        epoch_expr = "CAST(strftime('%s', created_at) AS INTEGER)"
+
     if before_created_at is not None:
         params["before_created_at"] = int(before_created_at)
-        sql = """
+        sql = f"""
             SELECT *
             FROM paidreviews.reviews
             WHERE settings_id = :settings_id
               AND tag = :tag
               AND paid = :paid
-              AND CAST(created_at AS INTEGER) < :before_created_at
-            ORDER BY CAST(created_at AS INTEGER) DESC
+              AND {epoch_expr} < :before_created_at
+            ORDER BY {epoch_expr} DESC
             LIMIT :limit
         """
     else:
-        sql = """
+        sql = f"""
             SELECT *
             FROM paidreviews.reviews
             WHERE settings_id = :settings_id
               AND tag = :tag
               AND paid = :paid
-            ORDER BY CAST(created_at AS INTEGER) DESC
+            ORDER BY {epoch_expr} DESC
             LIMIT :limit
         """
 
