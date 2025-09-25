@@ -10,7 +10,7 @@ async def m001_settings(db):
             description TEXT NOT NULL DEFAULT '',
             cost INTEGER DEFAULT 0,
             wallet TEXT NOT NULL DEFAULT '',
-            user TEXT NOT NULL UNIQUE,
+            user_id TEXT NOT NULL UNIQUE,
             comment_word_limit INTEGER DEFAULT 0,
             tags TEXT NOT NULL DEFAULT ''
         );

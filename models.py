@@ -10,14 +10,14 @@ class CreatePrSettings(BaseModel):
     wallet: str | None = Field(default=None)
     name: str | None = Field(default=None)
     description: str | None = Field(default=None)
-    user: str | None = Field(default=None)
+    user_id: str | None = Field(default=None)
     comment_word_limit: int = Field(default=0, ge=0)
     tags: list[str] = Field(default_factory=list)
 
 
 class PRSettings(BaseModel):
     id: str = Field(default_factory=urlsafe_short_hash)
-    user: str | None = None
+    user_id: str | None = None
     wallet: str
     cost: int
     name: str | None = None

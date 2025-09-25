@@ -17,10 +17,10 @@ async def update_settings(data: PRSettings) -> PRSettings:
     return PRSettings(**data.dict())
 
 
-async def get_settings(user: str) -> PRSettings | None:
+async def get_settings(user_id: str) -> PRSettings | None:
     return await db.fetchone(
-        "SELECT * FROM paidreviews.prsettings WHERE user = :user",
-        {"user": user},
+        "SELECT * FROM paidreviews.prsettings WHERE user_id = :user_id",
+        {"user_id": user_id},
         PRSettings,
     )
 

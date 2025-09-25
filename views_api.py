@@ -50,7 +50,7 @@ async def api_create_settings(
     wallet: WalletTypeInfo = Depends(require_admin_key),
 ) -> PRSettings:
     settings = PRSettings(**data.dict())
-    settings.user = wallet.wallet.user
+    settings.user_id = wallet.wallet.user
     settings = await create_settings(settings)
     return settings
 
@@ -67,7 +67,7 @@ async def api_update_settings(
             status_code=HTTPStatus.NOT_FOUND, detail="Settings do not exist."
         )
 
-    if settings.user != wallet.wallet.user:
+    if settings.user_id != wallet.wallet.user:
         raise HTTPException(
             status_code=HTTPStatus.FORBIDDEN, detail="Not your reviews."
         )
