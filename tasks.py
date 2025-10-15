@@ -31,9 +31,9 @@ async def on_invoice_paid(payment: Payment) -> None:
             settings = await get_settings_from_id(review.settings_id)
             if not settings:
                 return
-            await pay_tribute(settings.cost, settings.wallet)
     except Exception:
         return
+    await pay_tribute(settings.cost, settings.wallet)
 
 
 async def pay_tribute(haircut_amount: int, wallet_id: str) -> None:
