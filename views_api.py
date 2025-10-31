@@ -93,8 +93,17 @@ async def api_get_tags(response: Response, settings_id: str) -> list[RatingStats
 ############################# Reviews #############################
 
 ## TO DO:
-## Add pagination to the reviews endpoint
 ## Delete unpaid reviiews after a certain time period
+
+
+@paidreviews_api_router.get("/api/v1/{settings_id}")
+async def api_reviews_average_by_settings_id(settings_id: str) -> list[RatingStats]:
+    stats = await get_rating_stats_for_all_tags(settings_id)
+    if not stats:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="No reviews found."
+        )
+    return stats
 
 
 @paidreviews_api_router.get("/api/v1/{settings_id}/{tag}")
