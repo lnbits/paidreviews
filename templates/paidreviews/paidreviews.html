@@ -3,57 +3,9 @@
   <div class="col-10 text-h5 q-mb-xs">
     <span v-text="pr_name"></span> - <span v-text="pr_description"></span>
   </div>
-
-  <div class="col-12 col-sm-2 col-md-4 col-lg-3" style="order: 1">
-    <q-card class="q-pa-lg q-pb-xl">
-      <q-card-section class="q-pa-none">
-        <div class="text-center">
-          <q-form @submit="onSubmit">
-            <q-input
-              dense
-              filled
-              v-model="name"
-              label="Your name *"
-              lazy-rules
-              :rules="[ val => val && val.length > 0 || 'Please type something']"
-            ></q-input>
-            <div class="q-gutter-y-md column" style="max-width: 500px">
-              <q-input
-                dense
-                v-model="text"
-                :label="'Your review (max ' + pr_comment_word_limit + ' words)'"
-                filled
-                type="textarea"
-              ></q-input>
-            </div>
-            <div class="q-gutter-y-md column">
-              <q-rating
-                dense
-                v-model="rating"
-                size="sm"
-                max="10"
-                color="primary"
-                icon="star_border"
-                icon-selected="star"
-              ></q-rating>
-            </div>
-            <div>
-              <q-btn
-                label="Submit"
-                type="submit"
-                class="float-right"
-                color="primary"
-              ></q-btn>
-            </div>
-          </q-form>
-        </div>
-      </q-card-section>
-    </q-card>
-  </div>
-
   <div
-    class="col-12 col-sm-10 col-md-8 col-lg-7 q-gutter-y-md"
-    style="order: 2"
+    class="col-12 col-lg-7 q-gutter-y-md"
+    style="order: 1"
   >
     <q-card>
       <q-card-section>
@@ -142,6 +94,52 @@
           />
         </div>
       </q-card-actions>
+    </q-card>
+  </div>
+  <div class="col-12 col-sm-6 col-md-6 col-lg-3" style="order: 2">
+    <q-card class="q-pa-lg q-pb-xl">
+      <q-card-section class="q-pa-none">
+        <div class="text-center">
+          <q-form @submit="onSubmit">
+            <q-input
+              dense
+              filled
+              v-model="name"
+              label="Your name *"
+              lazy-rules
+              :rules="[ val => val && val.length > 0 || 'Please type something']"
+            ></q-input>
+            <div class="q-gutter-y-md column" style="max-width: 500px">
+              <q-input
+                dense
+                v-model="text"
+                :label="'Your review (max ' + pr_comment_word_limit + ' words)'"
+                filled
+                type="textarea"
+              ></q-input>
+            </div>
+            <div class="q-gutter-y-md column">
+              <q-rating
+                dense
+                v-model="rating"
+                size="sm"
+                max="10"
+                color="primary"
+                icon="star_border"
+                icon-selected="star"
+              ></q-rating>
+            </div>
+            <div>
+              <q-btn
+                label="Submit"
+                type="submit"
+                class="float-right"
+                color="primary"
+              ></q-btn>
+            </div>
+          </q-form>
+        </div>
+      </q-card-section>
     </q-card>
   </div>
 </div>
