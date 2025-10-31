@@ -1,5 +1,6 @@
 from http import HTTPStatus
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from lnbits.core.models import WalletTypeInfo
 from lnbits.core.services import create_invoice
@@ -86,24 +87,67 @@ async def api_update_settings(
 @paidreviews_api_router.get("/api/v1/tags/{settings_id}")
 async def api_get_tags(response: Response, settings_id: str) -> list[RatingStats]:
     tags = await get_rating_stats_for_all_tags(settings_id)
+    if not tags:
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="No tags found.")
     response.headers["Cache-Control"] = "public, max-age=30"
     return tags
+
+
+@paidreviews_api_router.post("/api/v1/tags/{settings_id}/sync")
+async def api_sync_tags_from_manifest(
+    response: Response,
+    settings_id: str,
+    wallet: WalletTypeInfo = Depends(require_admin_key),
+) -> dict:
+    settings = await get_settings_from_id(settings_id)
+    if not settings:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="Settings do not exist."
+        )
+    if settings.user_id != wallet.wallet.user:
+        raise HTTPException(
+            status_code=HTTPStatus.FORBIDDEN, detail="Not your reviews."
+        )
+    manifest_url = "https://raw.githubusercontent.com/lnbits/lnbits-extensions/refs/heads/main/extensions.json"
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.get(manifest_url)
+            r.raise_for_status()
+            manifest = r.json()
+    except Exception as e:
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_GATEWAY, detail="Could not load manifest."
+        ) from e
+
+    ids = set()
+    for ext in manifest.get("extensions", []) or []:
+        if isinstance(ext, dict) and ext.get("id"):
+            ids.add(ext["id"].strip())
+    if not ids:
+        raise HTTPException(
+            status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
+            detail="No extension ids found.",
+        )
+
+    current = set(settings.tags or [])
+    added = sorted(ids - current)
+
+    if added:
+        settings.tags = sorted(current | ids)
+        await update_settings(settings)
+
+    response.headers["Cache-Control"] = "no-store"
+    return {
+        "added_count": len(added),
+        "added": added,
+        "total_tags": len(settings.tags or []),
+    }
 
 
 ############################# Reviews #############################
 
 ## TO DO:
 ## Delete unpaid reviiews after a certain time period
-
-
-@paidreviews_api_router.get("/api/v1/{settings_id}")
-async def api_reviews_average_by_settings_id(settings_id: str) -> list[RatingStats]:
-    stats = await get_rating_stats_for_all_tags(settings_id)
-    if not stats:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="No reviews found."
-        )
-    return stats
 
 
 @paidreviews_api_router.get("/api/v1/{settings_id}/{tag}")
