@@ -1,6 +1,6 @@
-from lnbits.db import Database
+from lnbits.db import Connection, Database, Filters, Page
 
-from .models import PRSettings, RatingStats, Review
+from .models import PRSettings, RatingsFilters, RatingStats, Review
 
 db = Database("ext_paidreviews")
 
@@ -71,45 +71,19 @@ async def get_reviews_by_tag(
     settings_id: str,
     tag: str,
     *,
-    limit: int,
-    before_created_at: int | None = None,
-) -> list[Review]:
-    params = {
-        "settings_id": settings_id,
-        "tag": tag,
-        "paid": True,
-        "limit": limit,
-    }
-
-    if db.type in {"POSTGRES", "COCKROACH"}:
-        epoch_expr = "EXTRACT(EPOCH FROM created_at)::BIGINT"
-    else:  # SQLITE
-        epoch_expr = "CAST(strftime('%s', created_at) AS INTEGER)"
-
-    if before_created_at is not None:
-        params["before_created_at"] = int(before_created_at)
-        sql = f"""
-            SELECT *
-            FROM paidreviews.reviews
-            WHERE settings_id = :settings_id
-              AND tag = :tag
-              AND paid = :paid
-              AND {epoch_expr} < :before_created_at
-            ORDER BY {epoch_expr} DESC
-            LIMIT :limit
-        """
-    else:
-        sql = f"""
-            SELECT *
-            FROM paidreviews.reviews
-            WHERE settings_id = :settings_id
-              AND tag = :tag
-              AND paid = :paid
-            ORDER BY {epoch_expr} DESC
-            LIMIT :limit
-        """
-
-    return await db.fetchall(sql, params, model=Review)
+    filters: Filters[RatingsFilters] | None = None,
+    conn: Connection | None = None,
+) -> Page[Review]:
+    filters = filters or Filters()
+    filters.sortby = filters.sortby or "created_at"
+    return await (conn or db).fetch_page(
+        query="SELECT * FROM paidreviews.reviews",
+        where=["settings_id = :settings_id", "tag = :tag", "paid = :paid"],
+        values={"settings_id": settings_id, "tag": tag, "paid": True},
+        filters=filters,
+        model=Review,
+        table_name="paidreviews.reviews",
+    )
 
 
 async def update_review(data: Review) -> Review:

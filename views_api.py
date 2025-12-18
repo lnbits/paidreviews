@@ -1,7 +1,7 @@
 from http import HTTPStatus
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 from lnbits.core.models.users import AccountId
 from lnbits.core.services import create_invoice
 from lnbits.decorators import check_account_id_exists
@@ -21,11 +21,11 @@ from .crud import (
 )
 from .models import (
     CreatePrSettings,
-    KeysetPage,
     PostReview,
     PRSettings,
     RatingStats,
     Review,
+    ReviewstPage,
 )
 
 paidreviews_api_router = APIRouter()
@@ -153,39 +153,20 @@ async def api_sync_tags_from_manifest(
 # todo: pagination, better path
 @paidreviews_api_router.get("/api/v1/{settings_id}/{tag}")
 async def api_reviews_by_tag(
-    response: Response,
     settings_id: str,
     tag: str,
-    limit: int = Query(
-        ..., ge=1, le=50, description="Number of reviews to return (1-50)."
-    ),
-    before: int | None = Query(
-        None, description="Return items with created_at < this unix timestamp."
-    ),
-) -> KeysetPage:
-    items = await get_reviews_by_tag(
+) -> ReviewstPage:
+
+    reviews = await get_reviews_by_tag(
         settings_id=settings_id,
         tag=tag,
-        limit=limit,
-        before_created_at=before,
     )
-
-    next_cursor = None
-    if items and len(items) == limit and items[-1].created_at:
-        next_cursor = int(items[-1].created_at)
 
     stats = await get_rating_stats(settings_id, tag)
 
-    if response is not None:
-        response.headers["Cache-Control"] = "public, max-age=30"
-        response.headers["X-Page-Limit"] = str(limit)
-        if next_cursor is not None:
-            response.headers["X-Next-Cursor"] = str(next_cursor)
-
-    return KeysetPage(
-        items=items,
-        next_cursor=next_cursor,
-        review_count=stats.review_count,
+    return ReviewstPage(
+        data=reviews.data,
+        total=reviews.total,
         avg_rating=stats.avg_rating,
     )
 

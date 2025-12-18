@@ -72,7 +72,7 @@ exclude = [
 # RUF - ruff
 # B - bugbear
 select = ["F", "E", "W", "I", "A", "C", "N", "UP", "RUF", "B"]
-ignore = ["C901"]
+ignore = ["RUF012", "RUF043", "C901"]
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]
@@ -100,4 +100,6 @@ classmethod-decorators = [
 extend-immutable-calls = [
     "fastapi.Depends",
     "fastapi.Query",
+    "fastapi.Body",
+    "lnbits.decorators.parse_filters"
 ]

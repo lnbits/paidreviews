@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
+from typing import Generic, TypeVar
 
 from fastapi import Query
+from lnbits.db import FilterModel, Page
 from lnbits.helpers import urlsafe_short_hash
 from pydantic import BaseModel, Field
 
@@ -46,10 +48,9 @@ class PostReview(BaseModel):
     comment: str | None = Query(None)
 
 
-class KeysetPage(BaseModel):
-    items: list[Review]
-    next_cursor: int | None = None
-    review_count: int = 0
+# TModel = TypeVar("TModel", bound=Review)
+
+class ReviewstPage(Page):
     avg_rating: float = 0.0
 
 
@@ -57,3 +58,13 @@ class RatingStats(BaseModel):
     tag: str | None = None
     review_count: int = Field(0, ge=0)
     avg_rating: int
+
+
+class RatingsFilters(FilterModel):
+    __search_fields__ = ["name", "comment"]
+    __sort_fields__ = [
+        "created_at",
+        "name",
+    ]
+
+    name: str | None = None
