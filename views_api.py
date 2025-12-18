@@ -2,9 +2,9 @@ from http import HTTPStatus
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from lnbits.core.models import WalletTypeInfo
+from lnbits.core.models.users import AccountId
 from lnbits.core.services import create_invoice
-from lnbits.decorators import require_admin_key
+from lnbits.decorators import check_account_id_exists
 from loguru import logger
 
 from .crud import (
@@ -35,9 +35,9 @@ paidreviews_api_router = APIRouter()
 
 @paidreviews_api_router.get("/api/v1/settings")
 async def api_settings(
-    wallet: WalletTypeInfo = Depends(require_admin_key),
+    account_id: AccountId = Depends(check_account_id_exists),
 ) -> PRSettings:
-    pr_settings = await get_settings(wallet.wallet.user)
+    pr_settings = await get_settings(account_id.id)
     if not pr_settings:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="Update the settings."
@@ -48,10 +48,10 @@ async def api_settings(
 @paidreviews_api_router.post("/api/v1/settings")
 async def api_create_settings(
     data: CreatePrSettings,
-    wallet: WalletTypeInfo = Depends(require_admin_key),
+    account_id: AccountId = Depends(check_account_id_exists),
 ) -> PRSettings:
     settings = PRSettings(**data.dict())
-    settings.user_id = wallet.wallet.user
+    settings.user_id = account_id.id
     settings = await create_settings(settings)
     return settings
 
@@ -60,7 +60,7 @@ async def api_create_settings(
 async def api_update_settings(
     settings_id: str,
     data: CreatePrSettings,
-    wallet: WalletTypeInfo = Depends(require_admin_key),
+    account_id: AccountId = Depends(check_account_id_exists),
 ) -> PRSettings:
     settings = await get_settings_from_id(settings_id)
     if not settings:
@@ -68,7 +68,7 @@ async def api_update_settings(
             status_code=HTTPStatus.NOT_FOUND, detail="Settings do not exist."
         )
 
-    if settings.user_id != wallet.wallet.user:
+    if settings.user_id != account_id.id:
         raise HTTPException(
             status_code=HTTPStatus.FORBIDDEN, detail="Not your reviews."
         )
@@ -97,14 +97,14 @@ async def api_get_tags(response: Response, settings_id: str) -> list[RatingStats
 async def api_sync_tags_from_manifest(
     response: Response,
     settings_id: str,
-    wallet: WalletTypeInfo = Depends(require_admin_key),
+    account_id: AccountId = Depends(check_account_id_exists),
 ) -> dict:
     settings = await get_settings_from_id(settings_id)
     if not settings:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="Settings do not exist."
         )
-    if settings.user_id != wallet.wallet.user:
+    if settings.user_id != account_id.id:
         raise HTTPException(
             status_code=HTTPStatus.FORBIDDEN, detail="Not your reviews."
         )
@@ -150,6 +150,7 @@ async def api_sync_tags_from_manifest(
 ## Delete unpaid reviiews after a certain time period
 
 
+# todo: pagination, better path
 @paidreviews_api_router.get("/api/v1/{settings_id}/{tag}")
 async def api_reviews_by_tag(
     response: Response,
@@ -189,6 +190,7 @@ async def api_reviews_by_tag(
     )
 
 
+# todo: better path
 @paidreviews_api_router.post("/api/v1/review", status_code=HTTPStatus.CREATED)
 async def api_make_review(data: PostReview) -> dict:
     if not data.settings_id or data.settings_id == "":
@@ -258,7 +260,7 @@ async def api_make_review(data: PostReview) -> dict:
 
 @paidreviews_api_router.delete("/api/v1/review/{review_id}")
 async def api_delete_review(
-    review_id: str, wallet: WalletTypeInfo = Depends(require_admin_key)
+    review_id: str, account_id: AccountId = Depends(check_account_id_exists)
 ) -> None:
     review = await get_review(review_id)
     logger.debug(review)
@@ -271,7 +273,7 @@ async def api_delete_review(
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="Settings do not exist."
         )
-    if settings.wallet != wallet.wallet.id:
+    if settings.user_id != account_id.id:
         raise HTTPException(
             status_code=HTTPStatus.FORBIDDEN, detail="Not your extension."
         )
