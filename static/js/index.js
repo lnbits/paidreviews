@@ -25,13 +25,49 @@ window.app = Vue.createApp({
       limit: 10,
       nextCursor: null,
       cursorStack: [null],
-      paidReviewsLoading: false
+      paidReviewsLoading: false,
+      reviews: [],
+      reviewsTable: {
+        loading: false,
+        columns: [
+          {
+            name: 'actions',
+            align: 'left',
+            label: '',
+            field: 'actions',
+            sortable: false
+          },
+          {
+            name: 'name',
+            align: 'left',
+            label: this.$t('Name'),
+            field: 'name',
+            sortable: true
+          },
+
+          {
+            name: 'comment',
+            align: 'left',
+            label: this.$t('Comment'),
+            field: 'comment'
+          },
+          {
+            name: 'rating',
+            align: 'right',
+            label: 'Rating',
+            field: 'rating'
+          }
+        ],
+        pagination: {
+          rowsPerPage: 10,
+          sortBy: 'created_at',
+          descending: true,
+          page: 1
+        }
+      }
     }
   },
   computed: {
-    canGoBack() {
-      return this.cursorStack.length > 1
-    },
     // one decimal place like public page
     avgRating() {
       const v = Math.round(this.avgRatingRaw) / 2 / 100
@@ -95,109 +131,61 @@ window.app = Vue.createApp({
       }
     },
     async deleteReview(id) {
-      try {
-        await LNbits.api.request(
-          'DELETE',
-          `/paidreviews/api/v1/review/${encodeURIComponent(id)}`,
-          this.g.user.wallets[0].adminkey
-        )
-
-        // Optimistically remove from current page
-        const beforeCount = this.allReviews.length
-        this.allReviews = this.allReviews.filter(r => r.id !== id)
-
-        // Optionally nudge counters locally (server will correct on refetch)
-        if (beforeCount !== this.allReviews.length && this.reviewCount > 0) {
-          this.reviewCount -= 1
-        }
-
-        // Refresh the same page cursor + stats from server
-        await this.fetchPage({
-          before: this.cursorStack[this.cursorStack.length - 1] ?? null,
-          reset: true
+      this.$q
+        .dialog({
+          title: 'Confirm Delete',
+          message: 'Are you sure you want to delete this review?',
+          cancel: true,
+          persistent: true
         })
-      } catch (e) {
-        console.error(e)
-        this.$q.notify({
-          type: 'negative',
-          message: 'Delete failed',
-          position: 'bottom'
+        .onOk(async () => {
+          try {
+            await LNbits.api.request(
+              'DELETE',
+              `/paidreviews/api/v1/reviews/${this.settings.id}/${id}`
+            )
+
+            await this.getTagReviews()
+          } catch (e) {
+            console.error(e)
+            this.$q.notify({
+              type: 'negative',
+              message: 'Delete failed',
+              position: 'bottom'
+            })
+          }
         })
-      }
     },
     resetAndLoad() {
-      this.cursorStack = [null]
-      this.fetchPage({before: null, reset: true})
+      this.getTagReviews()
     },
-    async fetchPage({before = null, reset = false} = {}) {
-      if (!this.settings.id || !this.selectedTag) {
-        this.allReviews = []
-        this.avgRatingRaw = 0
-        this.reviewCount = 0
-        this.nextCursor = null
-        return
-      }
 
-      this.paidReviewsLoading = true
+    async getTagReviews(props) {
       try {
-        const params = new URLSearchParams({limit: String(this.limit)})
-
-        if (before !== null && before !== undefined) {
-          params.set('before', String(before))
-        }
-
-        // Cache buster so we don’t get stale lists after DELETE
-        params.set(
-          '_',
-          typeof crypto !== 'undefined' && crypto.randomUUID
-            ? crypto.randomUUID()
-            : String(Date.now())
+        this.reviewsTable.loading = true
+        const params = LNbits.utils.prepareFilterQuery(this.reviewsTable, props)
+        const {data} = await LNbits.api.request(
+          'GET',
+          `/paidreviews/api/v1/reviews/${this.settings.id}/${this.selectedTag}?${params}`,
+          null
         )
-
-        const url =
-          `/paidreviews/api/v1/${encodeURIComponent(this.settings.id)}/${encodeURIComponent(this.selectedTag)}?` +
-          params.toString()
-
-        const data = await LNbits.api
-          .request('GET', url, this.g.user.wallets[0].adminkey)
-          .then(r => r.data)
-
-        this.allReviews = data.items || []
-        this.nextCursor = data.next_cursor || null
-        this.avgRatingRaw = Number(data.avg_rating || 0)
-        this.reviewCount = Number(data.review_count || 0)
-
-        if (reset) {
-          // keep the current page’s cursor at the top of the stack
-          this.cursorStack = [before ?? null]
-        } else if (before !== null && before !== undefined) {
-          this.cursorStack.push(before)
-        }
+        this.reviews = data.data
+        this.avgRatingRaw = data.avg_rating
+        this.reviewsTable.pagination.rowsNumber = data.total
       } catch (e) {
-        console.error(e)
-        this.allReviews = []
-        this.nextCursor = null
+        LNbits.utils.notifyApiError(e)
       } finally {
-        this.paidReviewsLoading = false
+        this.reviewsTable.loading = false
       }
     },
-    async goNext() {
-      if (!this.nextCursor) return
-      await this.fetchPage({before: this.nextCursor, reset: false})
-    },
-    async goBack() {
-      if (!this.canGoBack) return
-      this.cursorStack.pop()
-      const prev = this.cursorStack[this.cursorStack.length - 1] ?? null
-      await this.fetchPage({before: prev, reset: true})
-    },
+
     fixRating(rating) {
       return Math.round((rating / 2 / 100) * 2) / 2
     }
   },
-  async mounted() {
+  async created() {
     await this.getSettings()
     this.selectedTag = this.settings.tags?.[0] || null
-    await this.fetchPage({before: null, reset: true})
+    await this.getTagReviews()
   }
 })
