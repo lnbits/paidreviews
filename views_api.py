@@ -165,7 +165,7 @@ async def api_reviews_by_tag(
     stats = await get_rating_stats(settings_id, tag)
 
     return ReviewstPage(
-        data=reviews.data,
+        data=reviews.data,  # type: ignore
         total=reviews.total,
         avg_rating=stats.avg_rating,
     )

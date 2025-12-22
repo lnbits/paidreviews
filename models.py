@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from typing import Generic, TypeVar
 
 from fastapi import Query
 from lnbits.db import FilterModel, Page
@@ -48,9 +47,7 @@ class PostReview(BaseModel):
     comment: str | None = Query(None)
 
 
-# TModel = TypeVar("TModel", bound=Review)
-
-class ReviewstPage(Page):
+class ReviewstPage(Page[Review]):
     avg_rating: float = 0.0
 
 
