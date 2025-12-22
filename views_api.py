@@ -6,7 +6,6 @@ from lnbits.core.models.users import AccountId
 from lnbits.core.services import create_invoice
 from lnbits.db import Filters
 from lnbits.decorators import check_account_id_exists, parse_filters
-from loguru import logger
 
 from .crud import (
     RatingsFilters,
@@ -152,8 +151,7 @@ async def api_sync_tags_from_manifest(
 ## Delete unpaid reviiews after a certain time period
 
 
-# todo: pagination, better path
-@paidreviews_api_router.get("/api/v1/{settings_id}/{tag}")
+@paidreviews_api_router.get("/api/v1/reviews/{settings_id}/{tag}")
 async def api_reviews_by_tag(
     settings_id: str,
     tag: str,
@@ -174,14 +172,16 @@ async def api_reviews_by_tag(
     )
 
 
-# todo: better path
-@paidreviews_api_router.post("/api/v1/review", status_code=HTTPStatus.CREATED)
-async def api_make_review(data: PostReview) -> dict:
-    if not data.settings_id or data.settings_id == "":
+@paidreviews_api_router.post(
+    "/api/v1/reviews/{settings_id}", status_code=HTTPStatus.CREATED
+)
+async def api_make_review(settings_id: str, data: PostReview) -> dict:
+    if not settings_id:
         raise HTTPException(
             status_code=HTTPStatus.BAD_REQUEST, detail="Settings ID is required."
         )
-    settings = await get_settings_from_id(data.settings_id)
+
+    settings = await get_settings_from_id(settings_id)
     if not settings or not settings.wallet:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND,
@@ -242,21 +242,25 @@ async def api_make_review(data: PostReview) -> dict:
         ) from e
 
 
-@paidreviews_api_router.delete("/api/v1/review/{review_id}")
+@paidreviews_api_router.delete("/api/v1/reviews/{settings_id}/{review_id}")
 async def api_delete_review(
-    review_id: str, account_id: AccountId = Depends(check_account_id_exists)
+    settings_id: str,
+    review_id: str,
+    account_id: AccountId = Depends(check_account_id_exists),
 ) -> None:
+    settings = await get_settings(account_id.id)
+    if not settings or settings.id != settings_id:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="Settings do not exist."
+        )
     review = await get_review(review_id)
-    logger.debug(review)
     if not review or not review.settings_id:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="Review does not exist."
         )
-    settings = await get_settings_from_id(review.settings_id)
-    if not settings:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="Settings do not exist."
-        )
+
+    if settings.id != review.settings_id:
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Bad review id.")
     if settings.user_id != account_id.id:
         raise HTTPException(
             status_code=HTTPStatus.FORBIDDEN, detail="Not your extension."

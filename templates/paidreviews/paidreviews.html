@@ -224,7 +224,7 @@
           const params = LNbits.utils.prepareFilterQuery(this.reviewsTable, props)
           const { data } = await LNbits.api.request(
             'GET',
-            `/paidreviews/api/v1/${this.pr_settings_id}/${this.pr_tag}?${params}`,
+            `/paidreviews/api/v1/reviews/${this.pr_settings_id}/${this.pr_tag}?${params}`,
             null
           )
           this.reviews = data.data
@@ -245,7 +245,7 @@
           comment: this.text
         }
 
-        const submit_review = await LNbits.api.request('POST', '/paidreviews/api/v1/review', null, review)
+        const submit_review = await LNbits.api.request('POST', `/paidreviews/api/v1/reviews/${this.pr_settings_id}`, null, review)
           .then(r => r.data)
           .catch(e => {
             console.log(e)

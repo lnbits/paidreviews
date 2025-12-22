@@ -40,7 +40,6 @@ class Review(BaseModel):
 
 
 class PostReview(BaseModel):
-    settings_id: str | None = Field(default=None)
     name: str | None = Query(None)
     tag: str | None = Query(None)
     rating: int = Query(..., ge=0, le=1000)
