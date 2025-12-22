@@ -1,13 +1,14 @@
 from http import HTTPStatus
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from lnbits.core.models import WalletTypeInfo
+from fastapi import APIRouter, Depends, HTTPException, Response
+from lnbits.core.models.users import AccountId
 from lnbits.core.services import create_invoice
-from lnbits.decorators import require_admin_key
-from loguru import logger
+from lnbits.db import Filters
+from lnbits.decorators import check_account_id_exists, parse_filters
 
 from .crud import (
+    RatingsFilters,
     create_review,
     create_settings,
     delete_review,
@@ -21,11 +22,11 @@ from .crud import (
 )
 from .models import (
     CreatePrSettings,
-    KeysetPage,
     PostReview,
     PRSettings,
     RatingStats,
     Review,
+    ReviewstPage,
 )
 
 paidreviews_api_router = APIRouter()
@@ -35,9 +36,9 @@ paidreviews_api_router = APIRouter()
 
 @paidreviews_api_router.get("/api/v1/settings")
 async def api_settings(
-    wallet: WalletTypeInfo = Depends(require_admin_key),
+    account_id: AccountId = Depends(check_account_id_exists),
 ) -> PRSettings:
-    pr_settings = await get_settings(wallet.wallet.user)
+    pr_settings = await get_settings(account_id.id)
     if not pr_settings:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="Update the settings."
@@ -48,10 +49,10 @@ async def api_settings(
 @paidreviews_api_router.post("/api/v1/settings")
 async def api_create_settings(
     data: CreatePrSettings,
-    wallet: WalletTypeInfo = Depends(require_admin_key),
+    account_id: AccountId = Depends(check_account_id_exists),
 ) -> PRSettings:
     settings = PRSettings(**data.dict())
-    settings.user_id = wallet.wallet.user
+    settings.user_id = account_id.id
     settings = await create_settings(settings)
     return settings
 
@@ -60,7 +61,7 @@ async def api_create_settings(
 async def api_update_settings(
     settings_id: str,
     data: CreatePrSettings,
-    wallet: WalletTypeInfo = Depends(require_admin_key),
+    account_id: AccountId = Depends(check_account_id_exists),
 ) -> PRSettings:
     settings = await get_settings_from_id(settings_id)
     if not settings:
@@ -68,7 +69,7 @@ async def api_update_settings(
             status_code=HTTPStatus.NOT_FOUND, detail="Settings do not exist."
         )
 
-    if settings.user_id != wallet.wallet.user:
+    if settings.user_id != account_id.id:
         raise HTTPException(
             status_code=HTTPStatus.FORBIDDEN, detail="Not your reviews."
         )
@@ -84,7 +85,7 @@ async def api_update_settings(
 ############################## Tags #############################
 
 
-@paidreviews_api_router.get("/api/v1/tags/{settings_id}")
+@paidreviews_api_router.get("/api/v1/{settings_id}/tags")
 async def api_get_tags(response: Response, settings_id: str) -> list[RatingStats]:
     tags = await get_rating_stats_for_all_tags(settings_id)
     if not tags:
@@ -93,18 +94,18 @@ async def api_get_tags(response: Response, settings_id: str) -> list[RatingStats
     return tags
 
 
-@paidreviews_api_router.post("/api/v1/tags/{settings_id}/sync")
+@paidreviews_api_router.post("/api/v1/{settings_id}/tags/sync")
 async def api_sync_tags_from_manifest(
     response: Response,
     settings_id: str,
-    wallet: WalletTypeInfo = Depends(require_admin_key),
+    account_id: AccountId = Depends(check_account_id_exists),
 ) -> dict:
     settings = await get_settings_from_id(settings_id)
     if not settings:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="Settings do not exist."
         )
-    if settings.user_id != wallet.wallet.user:
+    if settings.user_id != account_id.id:
         raise HTTPException(
             status_code=HTTPStatus.FORBIDDEN, detail="Not your reviews."
         )
@@ -150,52 +151,37 @@ async def api_sync_tags_from_manifest(
 ## Delete unpaid reviiews after a certain time period
 
 
-@paidreviews_api_router.get("/api/v1/{settings_id}/{tag}")
+@paidreviews_api_router.get("/api/v1/{settings_id}/reviews/{tag}")
 async def api_reviews_by_tag(
-    response: Response,
     settings_id: str,
     tag: str,
-    limit: int = Query(
-        ..., ge=1, le=50, description="Number of reviews to return (1-50)."
-    ),
-    before: int | None = Query(
-        None, description="Return items with created_at < this unix timestamp."
-    ),
-) -> KeysetPage:
-    items = await get_reviews_by_tag(
+    filters: Filters = Depends(parse_filters(RatingsFilters)),
+) -> ReviewstPage:
+    reviews = await get_reviews_by_tag(
         settings_id=settings_id,
         tag=tag,
-        limit=limit,
-        before_created_at=before,
+        filters=filters,
     )
-
-    next_cursor = None
-    if items and len(items) == limit and items[-1].created_at:
-        next_cursor = int(items[-1].created_at)
 
     stats = await get_rating_stats(settings_id, tag)
 
-    if response is not None:
-        response.headers["Cache-Control"] = "public, max-age=30"
-        response.headers["X-Page-Limit"] = str(limit)
-        if next_cursor is not None:
-            response.headers["X-Next-Cursor"] = str(next_cursor)
-
-    return KeysetPage(
-        items=items,
-        next_cursor=next_cursor,
-        review_count=stats.review_count,
+    return ReviewstPage(
+        data=reviews.data,  # type: ignore
+        total=reviews.total,
         avg_rating=stats.avg_rating,
     )
 
 
-@paidreviews_api_router.post("/api/v1/review", status_code=HTTPStatus.CREATED)
-async def api_make_review(data: PostReview) -> dict:
-    if not data.settings_id or data.settings_id == "":
+@paidreviews_api_router.post(
+    "/api/v1/{settings_id}/reviews", status_code=HTTPStatus.CREATED
+)
+async def api_make_review(settings_id: str, data: PostReview) -> dict:
+    if not settings_id:
         raise HTTPException(
             status_code=HTTPStatus.BAD_REQUEST, detail="Settings ID is required."
         )
-    settings = await get_settings_from_id(data.settings_id)
+
+    settings = await get_settings_from_id(settings_id)
     if not settings or not settings.wallet:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND,
@@ -256,22 +242,26 @@ async def api_make_review(data: PostReview) -> dict:
         ) from e
 
 
-@paidreviews_api_router.delete("/api/v1/review/{review_id}")
+@paidreviews_api_router.delete("/api/v1/{settings_id}/reviews/{review_id}")
 async def api_delete_review(
-    review_id: str, wallet: WalletTypeInfo = Depends(require_admin_key)
+    settings_id: str,
+    review_id: str,
+    account_id: AccountId = Depends(check_account_id_exists),
 ) -> None:
+    settings = await get_settings(account_id.id)
+    if not settings or settings.id != settings_id:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND, detail="Settings do not exist."
+        )
     review = await get_review(review_id)
-    logger.debug(review)
     if not review or not review.settings_id:
         raise HTTPException(
             status_code=HTTPStatus.NOT_FOUND, detail="Review does not exist."
         )
-    settings = await get_settings_from_id(review.settings_id)
-    if not settings:
-        raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail="Settings do not exist."
-        )
-    if settings.wallet != wallet.wallet.id:
+
+    if settings.id != review.settings_id:
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Bad review id.")
+    if settings.user_id != account_id.id:
         raise HTTPException(
             status_code=HTTPStatus.FORBIDDEN, detail="Not your extension."
         )

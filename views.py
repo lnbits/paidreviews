@@ -44,11 +44,7 @@ async def myextension(req: Request, settings_id: str, tag: str):
         )
 
     # Initial page only; hardcode page size
-    reviews = await get_reviews_by_tag(
-        settings_id=settings_id,
-        tag=tag,
-        limit=10,
-    )
+    reviews = await get_reviews_by_tag(settings_id=settings_id, tag=tag)
 
     stats = await get_rating_stats(settings_id, tag)
 

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import Query
+from lnbits.db import FilterModel, Page
 from lnbits.helpers import urlsafe_short_hash
 from pydantic import BaseModel, Field
 
@@ -35,21 +36,17 @@ class Review(BaseModel):
     comment: str | None = Field(default=None)
     paid: bool = Field(default=False)
     payment_hash: str | None = Field(default=None)
-    created_at: datetime = datetime.now(timezone.utc)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class PostReview(BaseModel):
-    settings_id: str | None = Field(default=None)
     name: str | None = Query(None)
     tag: str | None = Query(None)
     rating: int = Query(..., ge=0, le=1000)
     comment: str | None = Query(None)
 
 
-class KeysetPage(BaseModel):
-    items: list[Review]
-    next_cursor: int | None = None
-    review_count: int = 0
+class ReviewstPage(Page[Review]):
     avg_rating: float = 0.0
 
 
@@ -57,3 +54,13 @@ class RatingStats(BaseModel):
     tag: str | None = None
     review_count: int = Field(0, ge=0)
     avg_rating: int
+
+
+class RatingsFilters(FilterModel):
+    __search_fields__ = ["name", "comment"]
+    __sort_fields__ = [
+        "created_at",
+        "name",
+    ]
+
+    name: str | None = None
