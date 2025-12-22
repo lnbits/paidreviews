@@ -30,67 +30,41 @@
       </q-card-section>
 
       <q-separator></q-separator>
-      <div class="q-clearfix"></div>
-      <q-card-section class="q-pa-none">
-        <q-list>
-          <q-item
-            v-for="(review, index) in pr_reviews"
-            :key="review.id"
-            clickable
-          >
-            <q-item-section>
-              <q-item-label>
-                <div class="text-subtitle2 text-grey-4">
-                  <strong><span v-text="review.name"></span></strong>
-                  <small>
-                    (<span
-                      v-text="new Date(Number(review.created_at) * 1000).toLocaleString()"
-                    ></span
-                    >)
-                  </small>
-                </div>
-                <div class="text-body2" style="white-space: pre-wrap">
-                  <span v-text="review.comment"></span>
-                </div>
-              </q-item-label>
-            </q-item-section>
-            <q-item-section side top>
-              <q-rating
-                readonly
-                icon="star_border"
-                icon-selected="star"
-                icon-half="star_half"
-                :model-value="fixRating(review.rating)"
-                size="xs"
-                color="secondary"
-              ></q-rating>
-            </q-item-section>
-          </q-item>
-        </q-list>
-      </q-card-section>
 
-      <!-- Pager -->
-      <q-card-actions align="between">
-        <div>
-          <q-btn
-            flat
-            icon="chevron_left"
-            label="Back"
-            :disable="!canGoBack"
-            @click="goBack"
-          />
-        </div>
-        <div class="text-caption">Page size: <span v-text="limit"></span></div>
-        <div>
-          <q-btn
-            flat
-            icon-right="chevron_right"
-            label="Next"
-            :disable="!nextCursor"
-            @click="goNext"
-          />
-        </div>
-      </q-card-actions>
+      <q-card-section>
+        <q-table
+          :rows="reviews"
+          :columns="reviewsTable.columns"
+          v-model:pagination="reviewsTable.pagination"
+          @request="getTagReviews"
+          :loading="reviewsTable.loading"
+          row-key="name"
+          :filter="reviewsTable.search"
+        >
+          <template v-slot:body="props">
+            <q-tr :props="props">
+              <q-td key="name" :props="props">
+                <span v-text="props.row.name"></span>
+              </q-td>
+              <q-td key="comment" :props="props">
+                <span v-text="props.row.comment"></span>
+              </q-td>
+              <q-td key="rating" :props="props">
+                <q-rating
+                  class="float-right q-pt-xs"
+                  readonly
+                  icon="star_border"
+                  icon-selected="star"
+                  icon-half="star_half"
+                  :model-value="fixRating(props.row.rating)"
+                  size="sm"
+                  color="secondary"
+                ></q-rating>
+              </q-td>
+            </q-tr>
+          </template>
+        </q-table>
+      </q-card-section>
     </q-card>
   </div>
   <div class="col-12 col-sm-6 col-md-6 col-lg-3" style="order: 2">
@@ -143,7 +117,9 @@
 
 <q-dialog v-model="payment.show" position="top">
   <q-card class="q-pa-lg lnbits__dialog-card">
-    <center><p>Pay this invoice to submit review</p></center>
+    <center>
+      <p>Pay this invoice to submit review</p>
+    </center>
     <q-responsive :ratio="1" class="q-mx-xl q-mb-xl">
       <lnbits-qrcode
         :value="payment.invoice"
@@ -159,178 +135,172 @@
 </q-dialog>
 {% endblock %} {% block scripts %}
 <script>
-      const pr_reviews = {{ pr_reviews | tojson | safe }}
-      const initialAvg = '{{pr_avg_rating}}'
+  const pr_reviews = {{ pr_reviews | tojson | safe }}
+  const initialAvg = '{{pr_avg_rating}}'
 
-      window.app = Vue.createApp({
-        el: '#vue',
-        mixins: [windowMixin],
-        data () {
-          return {
-            pr_settings_id: '{{pr_settings_id}}',
-            pr_name: '{{pr_name}}',
-            pr_description: '{{pr_description}}',
-            pr_tag: '{{pr_tag}}',
-            pr_cost: '{{pr_cost}}',
-            pr_comment_word_limit: '{{pr_comment_word_limit}}',
+  window.app = Vue.createApp({
+    el: '#vue',
+    mixins: [windowMixin],
+    data() {
+      return {
+        pr_settings_id: '{{pr_settings_id}}',
+        pr_name: '{{pr_name}}',
+        pr_description: '{{pr_description}}',
+        pr_tag: '{{pr_tag}}',
+        pr_cost: '{{pr_cost}}',
+        pr_comment_word_limit: '{{pr_comment_word_limit}}',
 
-            // list + stats
-            pr_reviews: pr_reviews || [],
-            pr_avg_rating: isNaN(initialAvg) ? 0 : initialAvg,
-            pr_review_count: Array.isArray(pr_reviews) ? pr_reviews.length : 0,
+        // list + stats
+        pr_reviews: pr_reviews || [],
+        pr_avg_rating: isNaN(initialAvg) ? 0 : initialAvg,
+        pr_review_count: Array.isArray(pr_reviews) ? pr_reviews.length : 0,
 
-            // pagination
-            limit: 10,
-            nextCursor: null,
-            cursorStack: [null], // track cursors to support "Back"
-            loading: false,
+        // pagination
+        limit: 10,
+        nextCursor: null,
+        cursorStack: [null], // track cursors to support "Back"
+        loading: false,
 
-            // review form
-            name: '',
-            rating: 0,
-            text: '',
+        // review form
+        name: '',
+        rating: 0,
+        text: '',
 
-            // invoice dialog
-            payment: {
-              show: false,
-              invoice: '',
-              hash: ''
-            }
-          }
+        // invoice dialog
+        payment: {
+          show: false,
+          invoice: '',
+          hash: ''
         },
-        computed: {
-          canGoBack () {
-            return this.cursorStack.length > 1
-          },
-    avgRating () {
-      const v = Math.round(this.pr_avg_rating) / 2 / 100
-      // snap to nearest 0.5
-      const snapped = Math.round(v * 2) / 2
-      return snapped
-    }
-        },
-        mounted () {
-          // Replace server-rendered first page with API response to also get stats+cursor
-          this.fetchPage({ before: null, reset: true }).catch(() => {})
-        },
-        methods: {
-          async fetchPage ({ before = null, reset = false } = {}) {
-    this.loading = true
-    try {
-      const params = new URLSearchParams({ limit: String(this.limit) })
-      if (before !== null && before !== undefined) {
-        params.set('before', String(before))
-      }
-
-      // Cache buster to avoid stale lists after create/pay
-      params.set('_', (typeof crypto !== 'undefined' && crypto.randomUUID)
-        ? crypto.randomUUID()
-        : String(Date.now()))
-
-      const url = `/paidreviews/api/v1/${this.pr_settings_id}/${this.pr_tag}?` + params.toString()
-      const data = await LNbits.api.request('GET', url).then(r => r.data)
-
-      this.pr_reviews      = data.items || []
-      this.nextCursor      = data.next_cursor || null
-      this.pr_avg_rating   = Number(data.avg_rating || 0)
-      this.pr_review_count = Number(data.review_count || 0)
-
-      if (reset) {
-        // reflect the current page’s cursor in the stack
-        this.cursorStack = [before ?? null]
-      } else if (before !== null && before !== undefined) {
-        this.cursorStack.push(before)
-      }
-    } catch (e) {
-      console.error(e)
-      this.$q.notify({ type: 'negative', message: 'Failed to load reviews', position: 'bottom' })
-    } finally {
-      this.loading = false
-    }
-  }
-  ,
-
-          async goNext () {
-            if (!this.nextCursor) return
-            await this.fetchPage({ before: this.nextCursor, reset: false })
-          },
-
-          async goBack () {
-            if (!this.canGoBack) return
-            // Pop current cursor and read previous
-            this.cursorStack.pop() // remove current
-            const prev = this.cursorStack[this.cursorStack.length - 1] ?? null
-            // Reload using the previous cursor (null -> first page)
-            await this.fetchPage({ before: prev, reset: true })
-          },
-
-          async onSubmit () {
-            const review = {
-              settings_id: this.pr_settings_id,
-              name: this.name,
-              tag: this.pr_tag,
-              rating: this.rating * 100, // your backend expects 0..1000
-              comment: this.text
+        reviews: [],
+        reviewsTable: {
+          loading: false,
+          columns: [
+            {
+              name: 'name',
+              align: 'left',
+              label: this.$t('Name'),
+              field: 'name',
+              sortable: true
+            },
+            {
+              name: 'comment',
+              align: 'left',
+              label: this.$t('Comment'),
+              field: 'comment'
+            },
+            {
+              name: 'rating',
+              align: 'right',
+              label: 'Rating',
+              field: 'rating',
             }
-
-            const submit_review = await LNbits.api.request('POST', '/paidreviews/api/v1/review', null, review)
-              .then(r => r.data)
-              .catch(e => {
-                console.log(e)
-                const detail = e?.response?.data?.detail || e?.message || 'Unknown error'
-                this.$q.notify({ type: 'negative', message: detail, position: 'bottom' })
-                return null
-              })
-
-            if (!submit_review) return
-
-            if (submit_review.payment_request) {
-              this.payment.invoice = submit_review.payment_request
-              this.payment.hash = submit_review.payment_hash
-              this.payment.show = true
-              this.$q.notify({ type: 'positive', message: 'Please pay the invoice to submit your review.', position: 'bottom' })
-              this.websocket(this.payment.hash)
-            } else if (submit_review.message === true) {
-              this.$q.notify({ type: 'positive', message: 'Message posted.', position: 'bottom' })
-              this.onReset()
-              // Refresh first page + stats after a free (cost=0) review
-              await this.fetchPage({ before: null, reset: true })
-            } else {
-              this.$q.notify({ type: 'negative', message: 'Please try again.', position: 'bottom' })
-            }
-          },
-
-          onReset () {
-            this.name = ''
-            this.rating = 0
-            this.text = ''
-            this.payment.show = false
-          },
-
-          // Legacy function now calls the new paginated API for the first page
-          async getReviews () {
-            await this.fetchPage({ before: null, reset: true })
-          },
-
-          fixRating (rating) {
-            // convert 0..1000 -> 0..5 with .5 steps
-            return Math.round((rating / 2 / 100) * 2) / 2
-          },
-
-          websocket (hash) {
-            const url = new URL(window.location)
-            url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-            url.pathname = `/api/v1/ws/${hash}`
-            const ws = new WebSocket(url)
-            ws.addEventListener('message', async () => {
-              this.$q.notify({ type: 'positive', message: 'Invoice Paid' })
-              this.onReset()
-              // After payment, refresh first page + stats
-              await this.fetchPage({ before: null, reset: true })
-              ws.close()
-            })
+          ],
+          pagination: {
+            rowsPerPage: 10,
+            sortBy: 'created_at',
+            descending: true,
+            page: 1
           }
         }
-      })
+      }
+    },
+    computed: {
+      canGoBack() {
+        return this.cursorStack.length > 1
+      },
+      avgRating() {
+        const v = Math.round(this.pr_avg_rating) / 2 / 100
+        // snap to nearest 0.5
+        const snapped = Math.round(v * 2) / 2
+        return snapped
+      }
+    },
+
+    methods: {
+      async getTagReviews(props) {
+        try {
+          this.reviewsTable.loading = true
+          const params = LNbits.utils.prepareFilterQuery(this.reviewsTable, props)
+          const { data } = await LNbits.api.request(
+            'GET',
+            `/paidreviews/api/v1/${this.pr_settings_id}/${this.pr_tag}?${params}`,
+            null
+          )
+          this.reviews = data.data
+          this.reviewsTable.pagination.rowsNumber = data.total
+        } catch (e) {
+          LNbits.utils.notifyApiError(e)
+        } finally {
+          this.reviewsTable.loading = false
+        }
+      },
+
+      async onSubmit() {
+        const review = {
+          settings_id: this.pr_settings_id,
+          name: this.name,
+          tag: this.pr_tag,
+          rating: this.rating * 100, // your backend expects 0..1000
+          comment: this.text
+        }
+
+        const submit_review = await LNbits.api.request('POST', '/paidreviews/api/v1/review', null, review)
+          .then(r => r.data)
+          .catch(e => {
+            console.log(e)
+            const detail = e?.response?.data?.detail || e?.message || 'Unknown error'
+            this.$q.notify({ type: 'negative', message: detail, position: 'bottom' })
+            return null
+          })
+
+        if (!submit_review) return
+
+        if (submit_review.payment_request) {
+          this.payment.invoice = submit_review.payment_request
+          this.payment.hash = submit_review.payment_hash
+          this.payment.show = true
+          this.$q.notify({ type: 'positive', message: 'Please pay the invoice to submit your review.', position: 'bottom' })
+          this.websocket(this.payment.hash)
+        } else if (submit_review.message === true) {
+          this.$q.notify({ type: 'positive', message: 'Message posted.', position: 'bottom' })
+          this.onReset()
+          this.getTagReviews()
+        } else {
+          this.$q.notify({ type: 'negative', message: 'Please try again.', position: 'bottom' })
+        }
+      },
+
+      onReset() {
+        this.name = ''
+        this.rating = 0
+        this.text = ''
+        this.payment.show = false
+      },
+
+      fixRating(rating) {
+        // convert 0..1000 -> 0..5 with .5 steps
+        return Math.round((rating / 2 / 100) * 2) / 2
+      },
+
+      websocket(hash) {
+        const url = new URL(window.location)
+        url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+        url.pathname = `/api/v1/ws/${hash}`
+        const ws = new WebSocket(url)
+        ws.addEventListener('message', async () => {
+          this.$q.notify({ type: 'positive', message: 'Invoice Paid' })
+          this.onReset()
+          ws.close()
+          setTimeout(async () => {
+            await this.getTagReviews()
+          }, 3000)
+        })
+      }
+    },
+    async created() {
+      await this.getTagReviews()
+    }
+  })
 </script>
 {% endblock %}

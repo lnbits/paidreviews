@@ -4,10 +4,12 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Response
 from lnbits.core.models.users import AccountId
 from lnbits.core.services import create_invoice
-from lnbits.decorators import check_account_id_exists
+from lnbits.db import Filters
+from lnbits.decorators import check_account_id_exists, parse_filters
 from loguru import logger
 
 from .crud import (
+    RatingsFilters,
     create_review,
     create_settings,
     delete_review,
@@ -155,11 +157,12 @@ async def api_sync_tags_from_manifest(
 async def api_reviews_by_tag(
     settings_id: str,
     tag: str,
+    filters: Filters = Depends(parse_filters(RatingsFilters)),
 ) -> ReviewstPage:
-
     reviews = await get_reviews_by_tag(
         settings_id=settings_id,
         tag=tag,
+        filters=filters,
     )
 
     stats = await get_rating_stats(settings_id, tag)
