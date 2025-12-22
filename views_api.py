@@ -85,7 +85,7 @@ async def api_update_settings(
 ############################## Tags #############################
 
 
-@paidreviews_api_router.get("/api/v1/tags/{settings_id}")
+@paidreviews_api_router.get("/api/v1/{settings_id}/tags")
 async def api_get_tags(response: Response, settings_id: str) -> list[RatingStats]:
     tags = await get_rating_stats_for_all_tags(settings_id)
     if not tags:
@@ -94,7 +94,7 @@ async def api_get_tags(response: Response, settings_id: str) -> list[RatingStats
     return tags
 
 
-@paidreviews_api_router.post("/api/v1/tags/{settings_id}/sync")
+@paidreviews_api_router.post("/api/v1/{settings_id}/tags/sync")
 async def api_sync_tags_from_manifest(
     response: Response,
     settings_id: str,
@@ -151,7 +151,7 @@ async def api_sync_tags_from_manifest(
 ## Delete unpaid reviiews after a certain time period
 
 
-@paidreviews_api_router.get("/api/v1/reviews/{settings_id}/{tag}")
+@paidreviews_api_router.get("/api/v1/{settings_id}/reviews/{tag}")
 async def api_reviews_by_tag(
     settings_id: str,
     tag: str,
@@ -173,7 +173,7 @@ async def api_reviews_by_tag(
 
 
 @paidreviews_api_router.post(
-    "/api/v1/reviews/{settings_id}", status_code=HTTPStatus.CREATED
+    "/api/v1/{settings_id}/reviews", status_code=HTTPStatus.CREATED
 )
 async def api_make_review(settings_id: str, data: PostReview) -> dict:
     if not settings_id:
@@ -242,7 +242,7 @@ async def api_make_review(settings_id: str, data: PostReview) -> dict:
         ) from e
 
 
-@paidreviews_api_router.delete("/api/v1/reviews/{settings_id}/{review_id}")
+@paidreviews_api_router.delete("/api/v1/{settings_id}/reviews/{review_id}")
 async def api_delete_review(
     settings_id: str,
     review_id: str,

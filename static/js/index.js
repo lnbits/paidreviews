@@ -142,7 +142,7 @@ window.app = Vue.createApp({
           try {
             await LNbits.api.request(
               'DELETE',
-              `/paidreviews/api/v1/reviews/${this.settings.id}/${id}`
+              `/paidreviews/api/v1/${this.settings.id}/reviews/${id}`
             )
 
             await this.getTagReviews()
@@ -166,7 +166,7 @@ window.app = Vue.createApp({
         const params = LNbits.utils.prepareFilterQuery(this.reviewsTable, props)
         const {data} = await LNbits.api.request(
           'GET',
-          `/paidreviews/api/v1/reviews/${this.settings.id}/${this.selectedTag}?${params}`,
+          `/paidreviews/api/v1/${this.settings.id}/reviews/${this.selectedTag}?${params}`,
           null
         )
         this.reviews = data.data
