@@ -14,7 +14,7 @@
           </div>
         </div>
 
-        <div class="row q-col-gutter-md q-mt-sm">
+        <div class="row q-mt-sm q-gutter-y-md q-gutter-x-md">
           <div class="col-12 col-md-3">
             <q-input
               type="number"
@@ -61,7 +61,7 @@
             ></q-input>
           </div>
 
-          <div class="col-12 col-md-3">
+          <div class="col-12 col-md-4">
             <q-input
               dense
               filled
@@ -72,8 +72,9 @@
               :rules="[ val => val && val.length > 0 || 'Please type something']"
             ></q-input>
           </div>
-
-          <div class="col-12 col-md-4">
+        </div>
+        <div class="row q-mt-sm q-gutter-y-md q-gutter-x-md">
+          <div class="col-12">
             <q-select
               filled
               dense
@@ -87,11 +88,12 @@
               new-value-mode="add-unique"
               @new-value="onNewTag"
               hint="Type a tag and press Enter to add"
+              class="full-width"
             ></q-select>
           </div>
         </div>
 
-        <div class="row items-center">
+        <div class="row q-gutter-y-md q-gutter-x-md items-center">
           <div class="col-auto">
             <q-btn
               color="primary"
