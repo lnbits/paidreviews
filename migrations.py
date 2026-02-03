@@ -2,8 +2,7 @@ async def m001_settings(db):
     """
     Initial settings table.
     """
-    await db.execute(
-        """
+    await db.execute("""
         CREATE TABLE paidreviews.prsettings (
             id TEXT PRIMARY KEY NOT NULL,
             name TEXT NOT NULL DEFAULT '',
@@ -14,16 +13,14 @@ async def m001_settings(db):
             comment_word_limit INTEGER DEFAULT 0,
             tags TEXT NOT NULL DEFAULT ''
         );
-    """
-    )
+    """)
 
 
 async def m002_reviews(db):
     """
     Initial reviews table.
     """
-    await db.execute(
-        f"""
+    await db.execute(f"""
         CREATE TABLE paidreviews.reviews (
             id TEXT PRIMARY KEY NOT NULL,
             settings_id TEXT NOT NULL DEFAULT '',
@@ -35,8 +32,7 @@ async def m002_reviews(db):
             payment_hash TEXT NOT NULL DEFAULT '',
             created_at TIMESTAMP NOT NULL DEFAULT {db.timestamp_now}
         );
-    """
-    )
+    """)
 
 
 async def m003_average(db):
@@ -44,8 +40,7 @@ async def m003_average(db):
     Create a view to hold aggregated review stats (count + avg).
     """
     if db.type in {"POSTGRES", "COCKROACH"}:
-        await db.execute(
-            """
+        await db.execute("""
             CREATE OR REPLACE VIEW paidreviews.paidreviews_view_review_stats AS
             SELECT
               settings_id,
@@ -55,11 +50,9 @@ async def m003_average(db):
             FROM paidreviews.reviews
             WHERE paid = TRUE
             GROUP BY settings_id, tag;
-            """
-        )
+            """)
     elif db.type == "SQLITE":
-        await db.execute(
-            """
+        await db.execute("""
             CREATE VIEW IF NOT EXISTS paidreviews.paidreviews_view_review_stats AS
             SELECT
               settings_id,
@@ -69,5 +62,4 @@ async def m003_average(db):
             FROM reviews
             WHERE paid = 1
             GROUP BY settings_id, tag;
-            """
-        )
+            """)
