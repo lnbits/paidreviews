@@ -31,7 +31,7 @@ async def m002_reviews(db):
             tag TEXT NOT NULL DEFAULT '',
             rating INTEGER DEFAULT 0,
             comment TEXT NOT NULL DEFAULT '',
-            paid BOOLEAN DEFAULT 0,
+            paid BOOLEAN DEFAULT FALSE,
             payment_hash TEXT NOT NULL DEFAULT '',
             created_at TIMESTAMP NOT NULL DEFAULT {db.timestamp_now}
         );
