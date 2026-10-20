@@ -23,7 +23,7 @@ def paidreviews_renderer():
 @paidreviews_generic_router.get("/", response_class=HTMLResponse)
 async def index(req: Request, user: User = Depends(check_user_exists)):
     return paidreviews_renderer().TemplateResponse(
-        "paidreviews/index.html", {"request": req, "user": user.json()}
+        "paidreviews/index.html", {"request": req, "user": user.model_dump_json()}
     )
 
 

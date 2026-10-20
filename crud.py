@@ -9,12 +9,12 @@ db = Database("ext_paidreviews")
 
 async def create_settings(data: PRSettings) -> PRSettings:
     await db.insert("paidreviews.prsettings", data)
-    return PRSettings(**data.dict())
+    return PRSettings(**data.model_dump())
 
 
 async def update_settings(data: PRSettings) -> PRSettings:
     await db.update("paidreviews.prsettings", data)
-    return PRSettings(**data.dict())
+    return PRSettings(**data.model_dump())
 
 
 async def get_settings(user_id: str) -> PRSettings | None:
