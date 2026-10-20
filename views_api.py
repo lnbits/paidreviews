@@ -51,7 +51,7 @@ async def api_create_settings(
     data: CreatePrSettings,
     account_id: AccountId = Depends(check_account_id_exists),
 ) -> PRSettings:
-    settings = PRSettings(**data.dict())
+    settings = PRSettings(**data.model_dump())
     settings.user_id = account_id.id
     settings = await create_settings(settings)
     return settings
@@ -74,7 +74,7 @@ async def api_update_settings(
             status_code=HTTPStatus.FORBIDDEN, detail="Not your reviews."
         )
 
-    for field, value in data.dict().items():
+    for field, value in data.model_dump().items():
         if value is not None:
             setattr(settings, field, value)
 
