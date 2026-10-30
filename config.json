@@ -1,12 +1,12 @@
 {
   "id": "paidreviews",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "name": "PaidReviews",
   "repo": "https://github.com/lnbits/paidreviews",
   "short_description": "Pay to leave reviews based on tags",
   "description": "",
   "tile": "/paidreviews/static/image/paidreviews.png",
-  "min_lnbits_version": "1.3.0",
+  "min_lnbits_version": "1.7.0-rc1",
   "contributors": [
     {
       "name": "Alan Bits",
