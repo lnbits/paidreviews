@@ -58,7 +58,7 @@ async def myextension(req: Request, settings_id: str, tag: str):
             "pr_description": pr_settings.description,
             "pr_tag": tag,
             "pr_comment_word_limit": pr_settings.comment_word_limit,
-            "pr_reviews": jsonable_encoder(reviews),
+            "pr_reviews": jsonable_encoder(reviews.data),
             "pr_review_count": stats.review_count,
             "pr_avg_rating": stats.avg_rating,
             "web_manifest": f"/paidreviews/manifest/{settings_id}/{tag}.webmanifest",

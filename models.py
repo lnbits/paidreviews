@@ -53,7 +53,7 @@ class ReviewstPage(Page[Review]):
 class RatingStats(BaseModel):
     tag: str | None = None
     review_count: int = Field(0, ge=0)
-    avg_rating: int
+    avg_rating: float
 
 
 class RatingsFilters(FilterModel):

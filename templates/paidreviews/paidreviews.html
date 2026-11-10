@@ -153,7 +153,7 @@
         // list + stats
         pr_reviews: pr_reviews || [],
         pr_avg_rating: isNaN(initialAvg) ? 0 : initialAvg,
-        pr_review_count: Array.isArray(pr_reviews) ? pr_reviews.length : 0,
+        pr_review_count: {{ pr_review_count | tojson }},
 
         // pagination
         limit: 10,
@@ -225,6 +225,7 @@
             null
           )
           this.reviews = data.data
+          this.pr_review_count = data.total
           this.reviewsTable.pagination.rowsNumber = data.total
         } catch (e) {
           LNbits.utils.notifyApiError(e)
